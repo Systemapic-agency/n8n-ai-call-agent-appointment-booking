@@ -1,0 +1,142 @@
+{
+  "agent_id": "",
+  "channel": "voice",
+  "last_modification_timestamp": 1759596370831,
+  "agent_name": "Outbound - Medical Spa Agent",
+  "response_engine": {
+    "type": "retell-llm",
+    "llm_id": "llm_4cd49075b54e8a3f0290dec6e102",
+    "version": 5
+  },
+  "language": "en-US",
+  "data_storage_setting": "everything",
+  "opt_in_signed_url": false,
+  "end_call_after_silence_ms": 163000,
+  "version": 5,
+  "is_published": false,
+  "version_title": "",
+  "post_call_analysis_model": "gpt-4.1-mini",
+  "pii_config": {
+    "mode": "post_call",
+    "categories": []
+  },
+  "voice_id": "11labs-Chloe",
+  "enable_backchannel": true,
+  "backchannel_words": [
+    "yeah",
+    "hmm",
+    "uhmm"
+  ],
+  "max_call_duration_ms": 4635000,
+  "interruption_sensitivity": 0.8,
+  "ambient_sound": "call-center",
+  "ambient_sound_volume": 2,
+  "responsiveness": 1,
+  "ring_duration_ms": 62000,
+  "stt_mode": "accurate",
+  "vocab_specialization": "general",
+  "allow_user_dtmf": true,
+  "user_dtmf_options": {
+    "timeout_ms": 6500
+  },
+  "denoising_mode": "noise-and-background-speech-cancellation",
+  "retellLlmData": {
+    "llm_id": "llm_4cd49075b54e8a3f0290dec6e102",
+    "version": 5,
+    "model": "gpt-4.1",
+    "general_prompt": "You are Carolina, a warm and professional AI agent for Medical Spa Center. \nYour goal is to guide patients quickly, collect key details, and book a consultation or service appointment. \nKeep answers short (1–2 sentences), natural, and friendly. Avoid long monologues.  \n\n## Flow\n1. Greeting  \n“Hi {{name}}, this is Carolina from Medical Spa Center. How are you today?”\n\n2. Confirm Identity  \n\nAgent: “Before we continue, may I confirm your details?”  \n\n- First: “Your name is {{name}}, correct?”  \n   → Wait for response.  \n\n- If yes → continue: “And your email is {{email}}, right?”  \n   → Wait for response.  \n\n- If yes → continue: “Lastly, your phone number ends with {{phone}}, correct?”  \n   → Wait for response.  \n\n- If all correct → proceed.  \n- If any mismatch → politely ask for the correct info, or end if not the right person.  \n\n\n3. Permission to Talk  \n“Is now a good time for you to chat?”  \n(If not → ask for better time.)\n\n4. Transition & Value  \n“At our spa, we offer Botox, fillers, body contouring, IV therapy, and more. \nAre you interested in a specific service, or would you prefer a consultation?”\n\n5. Discovery (keep questions short)  \n- “What made you consider treatment now?”  \n- “Done Botox or fillers before?”  \n- “Which area interests you most: face, body, skin, or wellness?”  \n\n6. Booking Flow  \n- If service chosen → “Great, let me check our availability. Do you prefer morning or afternoon?”  \n- If unsure → “A consultation is best. Do you prefer morning or afternoon?”  \n\n➡️ **When customer is ready to book:**  \n- Call function `check_cal_availability(service, date, time)`  \n- If slot available → confirm with customer → Call function `book_appointment(service, date, time, customer_details)`  \n\n7. After Booking  \n“Perfect, your [service/consultation] is booked. We’ll send confirmation and prep instructions by email or text. Anything else I can help with?”  \n\n8. If No Booking  \nOffer digital brochure or follow-up call later.  \n\n## Guidelines\n- Always use {{name}} in conversation.  \n- Keep tone friendly, empathetic, not robotic.  \n- Never give medical guarantees — say “our doctor will assess your needs, results vary.”  \n- Use short answers, not long paragraphs.  \n- Main goal: **secure consultation booking**.  \n",
+    "general_tools": [
+      {
+        "headers": {},
+        "parameter_type": "form",
+        "method": "POST",
+        "query_params": {},
+        "description": "Use this to check the availability in GHL Calender make sure time zone is GMT-05:00 America/Cancun (EST)",
+        "type": "custom",
+        "url": "https://n8n.srv1013100.hstgr.cloud/webhook/b7c95dd0-2461-4df6-b2ce-bbf22428300b",
+        "args_at_root": false,
+        "timeout_ms": 120000,
+        "speak_after_execution": true,
+        "name": "check_cal_availablity",
+        "response_variables": {},
+        "speak_during_execution": false,
+        "parameters": {
+          "type": "object",
+          "required": [
+            "availability"
+          ],
+          "properties": {
+            "appointment_date": {
+              "type": "string",
+              "description": "Return an absolute RFC3339 datetime in America/Cancun (EST) with offset,  (no relative words)."
+            },
+            "service": {
+              "type": "string",
+              "description": "Return the Service User selected. (eg: Laser treatment, Facial, Botox, Fillers, or etc)"
+            }
+          }
+        }
+      },
+      {
+        "headers": {},
+        "parameter_type": "json",
+        "method": "POST",
+        "query_params": {},
+        "description": "use this to book an appointment in GHL make sure time zone is GMT-05:00 America/Cancun (EST)",
+        "type": "custom",
+        "url": "https://n8n.srv1013100.hstgr.cloud/webhook/27a452e7-d4dd-4328-97fc-973a7cf8dbd3",
+        "args_at_root": false,
+        "timeout_ms": 120000,
+        "speak_after_execution": true,
+        "name": "book_appointment",
+        "response_variables": {},
+        "speak_during_execution": false,
+        "parameters": {
+          "type": "object",
+          "required": [
+            "appointment_datetime",
+            "service",
+            "client_name",
+            "client_phone"
+          ],
+          "properties": {
+            "client_email": {
+              "type": "string",
+              "description": "get the user email"
+            },
+            "client_phone": {
+              "type": "number",
+              "description": "The user's phone number in E.164 international format."
+            },
+            "client_name": {
+              "type": "string",
+              "description": "The user's full name."
+            },
+            "service": {
+              "type": "string",
+              "description": "The name of the service the user is interested in booking."
+            },
+            "appointment_datetime": {
+              "type": "string",
+              "description": "The timestamp of the appointment in ISO 8601 format. make sure time zone is  GMT-05:00 America/Cancun (EST)"
+            }
+          }
+        }
+      },
+      {
+        "name": "end_call",
+        "type": "end_call",
+        "description": "End the call when the user says goodbye or indicates they have no further questions. Also end the call if the conversation has gone idle or inactive for a while."
+      }
+    ],
+    "states": [],
+    "start_speaker": "agent",
+    "knowledge_base_ids": [],
+    "kb_config": {
+      "top_k": 3,
+      "filter_score": 0.6
+    },
+    "last_modification_timestamp": 1759595530156,
+    "is_published": false
+  }
+}
