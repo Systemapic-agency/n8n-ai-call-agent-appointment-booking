@@ -1,0 +1,2079 @@
+{
+  "name": "SS02 - Inbound/Outbound - Checking Availability from GHL Calenders(Medical Spa)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "b7c95dd0-2461-4df6-b2ce-bbf22428300b",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -1344,
+        384
+      ],
+      "id": "4c01a0fd-ec90-4efb-a506-249970b1a711",
+      "name": "Webhook",
+      "webhookId": "b7c95dd0-2461-4df6-b2ce-bbf22428300b"
+    },
+    {
+      "parameters": {
+        "operation": "addToDate",
+        "magnitude": "={{ $json.formattedDate }}",
+        "duration": 1,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dateTime",
+      "typeVersion": 2,
+      "position": [
+        480,
+        0
+      ],
+      "id": "d60067f8-b4d8-47a6-900d-5676b95e5c37",
+      "name": "Get Next Date"
+    },
+    {
+      "parameters": {
+        "operation": "formatDate",
+        "date": "={{ $json.newDate }}",
+        "format": "x",
+        "outputFieldName": "endDate",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dateTime",
+      "typeVersion": 2,
+      "position": [
+        688,
+        0
+      ],
+      "id": "bbfc6eec-8eb3-43c3-ac52-7ec6262eb15e",
+      "name": "Get End Date"
+    },
+    {
+      "parameters": {
+        "operation": "formatDate",
+        "date": "={{ $json.body.args.appointment_date }}",
+        "format": "x",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dateTime",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ],
+      "id": "e835a678-abea-422a-bcfa-c96bd4e88327",
+      "name": "Get Start Date"
+    },
+    {
+      "parameters": {
+        "url": "https://services.leadconnectorhq.com/calendars/[Calendar ID]/free-slots",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "endDate",
+              "value": "={{ $json.endDate }}"
+            },
+            {
+              "name": "startDate",
+              "value": "={{ $('Get Start Date').item.json.formattedDate }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer [Your Bearer Token]"
+            },
+            {
+              "name": "Version",
+              "value": "2021-04-15"
+            },
+            {
+              "name": "timezone",
+              "value": "America/New_York"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        896,
+        0
+      ],
+      "id": "e61dae29-2c4b-4aeb-ad33-36f3b7493811",
+      "name": "Get free slots from ghl"
+    },
+    {
+      "parameters": {
+        "jsCode": "// The datetime to check\nconst targetDateTime = $('Webhook').first().json.body.appointment_date;\n\n// The data object\nconst data = $input.first().json;\n\n// Helper function to format time while respecting the original timezone\nfunction formatTime(dateString) {\n  const date = new Date(dateString);\n  const options = {\n    hour: 'numeric',\n    minute: 'numeric',\n    hour12: true,\n    timeZone: 'America/Los_Angeles' // Use a specific timezone if needed\n  };\n  return date.toLocaleTimeString('en-US', options);\n}\n\n// Helper function to get day of the week\nfunction getDayOfWeek(dateString) {\n  const date = new Date(dateString);\n  const options = { weekday: 'long', timeZone: 'America/Los_Angeles' }; // Use specific timezone if needed\n  return date.toLocaleDateString('en-US', options);\n}\n\n// Flatten the slots into a single array\nlet allSlots = [];\nfor (const [date, details] of Object.entries(data)) {\n  if (details.slots) {\n    allSlots = allSlots.concat(details.slots);\n  }\n}\n\n// Check if the target datetime is present\nif (allSlots.includes(targetDateTime)) {\n  const day = getDayOfWeek(targetDateTime);\n  const time = formatTime(targetDateTime);\n  return { result: `${day} at ${time} is available.` };\n} else {\n  // Convert datetimes to Date objects with original strings for time zone preservation\n  const slotsWithOriginal = allSlots.map(slot => ({ date: new Date(slot), original: slot }));\n  const targetDate = new Date(targetDateTime);\n\n  // Sort slots by date\n  const sortedSlots = slotsWithOriginal.sort((a, b) => a.date - b.date);\n\n  // Find the two closest slots\n  let closestBefore = null;\n  let closestAfter = null;\n  let secondClosestAfter = null;\n\n  for (let i = 0; i < sortedSlots.length; i++) {\n    if (sortedSlots[i].date < targetDate) {\n      closestBefore = sortedSlots[i].original;\n    } else if (!closestAfter) {\n      closestAfter = sortedSlots[i].original;\n      if (i + 1 < sortedSlots.length) {\n        secondClosestAfter = sortedSlots[i + 1].original;\n      }\n      break;\n    }\n  }\n\n  // If no closestBefore, return two closest after\n  if (!closestBefore) {\n    closestBefore = closestAfter;\n    closestAfter = secondClosestAfter;\n  }\n\n  return { closestBefore, closestAfter };\n}\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1168,
+        0
+      ],
+      "id": "18419d86-242c-416b-bae4-d13b50171da0",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get current year from system date\nconst currentYear = new Date().getFullYear();\nfor (const item of $input.all()) {\n  const appointmentDate = item.json.body?.args?.appointment_datetime;\n  if (appointmentDate) {\n    const oldDate = new Date(appointmentDate);\n    oldDate.setFullYear(currentYear);\n    // Set the updated date back in the same nested structure\n    item.json.body.args.appointment_datetime = oldDate.toISOString();\n  }\n}\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "d431196c-5d0b-4b3c-bd16-e33e13674874",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.closestBefore }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1408,
+        0
+      ],
+      "id": "85c4666b-1081-47f5-9021-453ee6c4b9a3",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "a0f8d331-fee8-4690-8ede-0c824734776c",
+              "leftValue": "={{ $json.body.args.service }}",
+              "rightValue": "General Consultation",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "id": "430a725d-30b5-40fd-950d-975edcc42f5e",
+              "leftValue": "={{ $json.body.args.service }}",
+              "rightValue": "Laser",
+              "operator": {
+                "type": "string",
+                "operation": "notContains"
+              }
+            },
+            {
+              "id": "b95526d5-6b9e-4217-9971-a285d29cd3d3",
+              "leftValue": "={{ $json.body.args.service }}",
+              "rightValue": "Botox",
+              "operator": {
+                "type": "string",
+                "operation": "notContains"
+              }
+            },
+            {
+              "id": "0aa4f034-3fce-4971-b417-1d9d8be7659d",
+              "leftValue": "={{ $json.body.args.service }}",
+              "rightValue": "Fillers",
+              "operator": {
+                "type": "string",
+                "operation": "notContains"
+              }
+            },
+            {
+              "id": "df4d4421-1f84-44ee-a3b0-c1f9489596e6",
+              "leftValue": "={{ $json.body.args.service }}",
+              "rightValue": "Wellness",
+              "operator": {
+                "type": "string",
+                "operation": "notContains"
+              }
+            },
+            {
+              "id": "8c8911a5-9fda-4cdc-bf97-561af0fa0ab2",
+              "leftValue": "={{ $json.body.args.service }}",
+              "rightValue": "Facial",
+              "operator": {
+                "type": "string",
+                "operation": "notContains"
+              }
+            },
+            {
+              "id": "25881944-b4ea-40b9-ac95-026456816175",
+              "leftValue": "={{ $json.body.args.service }}",
+              "rightValue": "Body Contouring",
+              "operator": {
+                "type": "string",
+                "operation": "notContains"
+              }
+            },
+            {
+              "id": "31a4e563-3cc9-4f60-87dd-9217d517fdbe",
+              "leftValue": "={{ $json.body.args.service }}",
+              "rightValue": "Weight Loss",
+              "operator": {
+                "type": "string",
+                "operation": "notContains"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -416,
+        16
+      ],
+      "id": "7d2aa800-d614-4641-b0aa-66778a5b8de2",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.body.args.service }}",
+                    "rightValue": "General Consultation",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "3b3e5b98-9a7f-4f9f-9c5d-d67fea72438a"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "8d0ec576-6e0b-4409-9aac-16d779363963",
+                    "leftValue": "={{ $json.body.args.service }}",
+                    "rightValue": "=Laser",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "69a33f98-7355-41c0-ab74-7ab3a2fa9694",
+                    "leftValue": "={{ $json.body.args.service }}",
+                    "rightValue": "Facial",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "1dd4913d-4a3c-426c-9bec-237ba562441d",
+                    "leftValue": "={{ $json.body.args.service }}",
+                    "rightValue": "Botox",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "0aabe05b-3477-4659-9f8b-9f25cbc7d9b1",
+                    "leftValue": "={{ $json.body.args.service }}",
+                    "rightValue": "Medical Weight Loss",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "2930fe9f-305b-43da-aaf1-506171802e1d",
+                    "leftValue": "={{ $json.body.args.service }}",
+                    "rightValue": "Wellness",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "489615fd-0fea-4731-812c-a3fbc5d82b17",
+                    "leftValue": "={{ $json.body.args.service }}",
+                    "rightValue": "Body Contouring",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "7ce1d8cb-3a1f-4d44-a7f5-f283d8a2cc33",
+                    "leftValue": "={{ $json.body.args.service }}",
+                    "rightValue": "Fat Reduction",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "b5764a2e-e7f1-4056-ac54-c2db3200351f",
+                    "leftValue": "={{ $json.body.args.service }}",
+                    "rightValue": "IV Therapy",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "95b154fa-e847-4377-97c9-7861751887ed",
+                    "leftValue": "={{ $json.body.args.service }}",
+                    "rightValue": "Fillers",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        -1024,
+        320
+      ],
+      "id": "fcbdaa7a-32b9-4f3a-8dc4-ea08ccc247e4",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "operation": "addToDate",
+        "magnitude": "={{ $json.formattedDate }}",
+        "duration": 1,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dateTime",
+      "typeVersion": 2,
+      "position": [
+        480,
+        208
+      ],
+      "id": "b5d6ab37-3b2d-4551-a874-dc763fed7ca9",
+      "name": "Get Next Date1"
+    },
+    {
+      "parameters": {
+        "operation": "formatDate",
+        "date": "={{ $json.newDate }}",
+        "format": "x",
+        "outputFieldName": "endDate",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dateTime",
+      "typeVersion": 2,
+      "position": [
+        672,
+        208
+      ],
+      "id": "a1598fcf-c595-4ba1-a264-14e1700c44dc",
+      "name": "Get End Date1"
+    },
+    {
+      "parameters": {
+        "operation": "formatDate",
+        "date": "={{ $json.body.args.appointment_date }}",
+        "format": "x",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dateTime",
+      "typeVersion": 2,
+      "position": [
+        240,
+        208
+      ],
+      "id": "774c11ed-c705-4355-acbb-64eefa69434a",
+      "name": "Get Start Date1"
+    },
+    {
+      "parameters": {
+        "url": "https://services.leadconnectorhq.com/calendars/[Calendar ID]/free-slots",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "endDate",
+              "value": "={{ $json.endDate }}"
+            },
+            {
+              "name": "startDate",
+              "value": "={{ $('Get Start Date1').item.json.formattedDate }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer [Your Bearer Token]"
+            },
+            {
+              "name": "Version",
+              "value": "2021-04-15"
+            },
+            {
+              "name": "timezone",
+              "value": "America/New_York"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        896,
+        208
+      ],
+      "id": "a340d880-4d2a-40ef-854f-5e80ad1885c7",
+      "name": "Get free slots from ghl1"
+    },
+    {
+      "parameters": {
+        "jsCode": "// The datetime to check\nconst targetDateTime = $('Webhook').first().json.body.appointment_date;\n\n// The data object\nconst data = $input.first().json;\n\n// Helper function to format time while respecting the original timezone\nfunction formatTime(dateString) {\n  const date = new Date(dateString);\n  const options = {\n    hour: 'numeric',\n    minute: 'numeric',\n    hour12: true,\n    timeZone: 'America/Los_Angeles' // Use a specific timezone if needed\n  };\n  return date.toLocaleTimeString('en-US', options);\n}\n\n// Helper function to get day of the week\nfunction getDayOfWeek(dateString) {\n  const date = new Date(dateString);\n  const options = { weekday: 'long', timeZone: 'America/Los_Angeles' }; // Use specific timezone if needed\n  return date.toLocaleDateString('en-US', options);\n}\n\n// Flatten the slots into a single array\nlet allSlots = [];\nfor (const [date, details] of Object.entries(data)) {\n  if (details.slots) {\n    allSlots = allSlots.concat(details.slots);\n  }\n}\n\n// Check if the target datetime is present\nif (allSlots.includes(targetDateTime)) {\n  const day = getDayOfWeek(targetDateTime);\n  const time = formatTime(targetDateTime);\n  return { result: `${day} at ${time} is available.` };\n} else {\n  // Convert datetimes to Date objects with original strings for time zone preservation\n  const slotsWithOriginal = allSlots.map(slot => ({ date: new Date(slot), original: slot }));\n  const targetDate = new Date(targetDateTime);\n\n  // Sort slots by date\n  const sortedSlots = slotsWithOriginal.sort((a, b) => a.date - b.date);\n\n  // Find the two closest slots\n  let closestBefore = null;\n  let closestAfter = null;\n  let secondClosestAfter = null;\n\n  for (let i = 0; i < sortedSlots.length; i++) {\n    if (sortedSlots[i].date < targetDate) {\n      closestBefore = sortedSlots[i].original;\n    } else if (!closestAfter) {\n      closestAfter = sortedSlots[i].original;\n      if (i + 1 < sortedSlots.length) {\n        secondClosestAfter = sortedSlots[i + 1].original;\n      }\n      break;\n    }\n  }\n\n  // If no closestBefore, return two closest after\n  if (!closestBefore) {\n    closestBefore = closestAfter;\n    closestAfter = secondClosestAfter;\n  }\n\n  return { closestBefore, closestAfter };\n}\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1152,
+        208
+      ],
+      "id": "f6d4887c-4d7a-401c-9c23-399e15635ad5",
+      "name": "Code in JavaScript2"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get current year from system date\nconst currentYear = new Date().getFullYear();\nfor (const item of $input.all()) {\n  const appointmentDate = item.json.body?.args?.appointment_datetime;\n  if (appointmentDate) {\n    const oldDate = new Date(appointmentDate);\n    oldDate.setFullYear(currentYear);\n    // Set the updated date back in the same nested structure\n    item.json.body.args.appointment_datetime = oldDate.toISOString();\n  }\n}\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        208
+      ],
+      "id": "da586949-58b8-4edd-a270-1a4595f81c25",
+      "name": "Code in JavaScript3"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.closestBefore }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1424,
+        208
+      ],
+      "id": "ed16da06-9c6e-49f3-bcdf-9c620345bf33",
+      "name": "Respond to Webhook1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "a0f8d331-fee8-4690-8ede-0c824734776c",
+              "leftValue": "={{ $json.body.args.service }}",
+              "rightValue": "Laser",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "id": "430a725d-30b5-40fd-950d-975edcc42f5e",
+              "leftValue": "={{ $json.body.args.service }}",
+              "rightValue": "General",
+              "operator": {
+                "type": "string",
+                "operation": "notContains"
+              }
+            },
+            {
+              "id": "b95526d5-6b9e-4217-9971-a285d29cd3d3",
+              "leftValue": "={{ $json.body.args.service }}",
+              "rightValue": "Botox",
+              "operator": {
+                "type": "string",
+                "operation": "notContains"
+              }
+            },
+            {
+              "id": "0aa4f034-3fce-4971-b417-1d9d8be7659d",
+              "leftValue": "={{ $json.body.args.service }}",
+              "rightValue": "Fillers",
+              "operator": {
+                "type": "string",
+                "operation": "notContains"
+              }
+            },
+            {
+              "id": "df4d4421-1f84-44ee-a3b0-c1f9489596e6",
+              "leftValue": "={{ $json.body.args.service }}",
+              "rightValue": "Wellness",
+              "operator": {
+                "type": "string",
+                "operation": "notContains"
+              }
+            },
+            {
+              "id": "8c8911a5-9fda-4cdc-bf97-561af0fa0ab2",
+              "leftValue": "={{ $json.body.args.service }}",
+              "rightValue": "Facial",
+              "operator": {
+                "type": "string",
+                "operation": "notContains"
+              }
+            },
+            {
+              "id": "25881944-b4ea-40b9-ac95-026456816175",
+              "leftValue": "={{ $json.body.args.service }}",
+              "rightValue": "Body Contouring",
+              "operator": {
+                "type": "string",
+                "operation": "notContains"
+              }
+            },
+            {
+              "id": "31a4e563-3cc9-4f60-87dd-9217d517fdbe",
+              "leftValue": "={{ $json.body.args.service }}",
+              "rightValue": "Weight Loss",
+              "operator": {
+                "type": "string",
+                "operation": "notContains"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -432,
+        208
+      ],
+      "id": "ff85563a-4aaf-4001-a2be-3e7ff3eef6d2",
+      "name": "If1"
+    },
+    {
+      "parameters": {
+        "operation": "addToDate",
+        "magnitude": "={{ $json.formattedDate }}",
+        "duration": 1,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dateTime",
+      "typeVersion": 2,
+      "position": [
+        480,
+        368
+      ],
+      "id": "a279147f-43a1-4500-851d-7a7df86ee514",
+      "name": "Get Next Date2"
+    },
+    {
+      "parameters": {
+        "operation": "formatDate",
+        "date": "={{ $json.newDate }}",
+        "format": "x",
+        "outputFieldName": "endDate",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dateTime",
+      "typeVersion": 2,
+      "position": [
+        672,
+        368
+      ],
+      "id": "e6dc0053-03c8-4781-865b-127b6f7e3d9d",
+      "name": "Get End Date2"
+    },
+    {
+      "parameters": {
+        "operation": "formatDate",
+        "date": "={{ $json.body.args.appointment_date }}",
+        "format": "x",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dateTime",
+      "typeVersion": 2,
+      "position": [
+        240,
+        368
+      ],
+      "id": "e6ce865b-6bf4-474a-b0a1-42218ac18c4b",
+      "name": "Get Start Date2"
+    },
+    {
+      "parameters": {
+        "url": "https://services.leadconnectorhq.com/calendars/[Calendar ID]/free-slots",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "endDate",
+              "value": "={{ $json.endDate }}"
+            },
+            {
+              "name": "startDate",
+              "value": "={{ $('Get Start Date2').item.json.formattedDate }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer [Your Bearer Token]"
+            },
+            {
+              "name": "Version",
+              "value": "2021-04-15"
+            },
+            {
+              "name": "timezone",
+              "value": "America/New_York"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        912,
+        368
+      ],
+      "id": "27900f98-e95f-471d-8250-7b95e0ab3106",
+      "name": "Get free slots from ghl2"
+    },
+    {
+      "parameters": {
+        "jsCode": "// The datetime to check\nconst targetDateTime = $('Webhook').first().json.body.appointment_date;\n\n// The data object\nconst data = $input.first().json;\n\n// Helper function to format time while respecting the original timezone\nfunction formatTime(dateString) {\n  const date = new Date(dateString);\n  const options = {\n    hour: 'numeric',\n    minute: 'numeric',\n    hour12: true,\n    timeZone: 'America/Los_Angeles' // Use a specific timezone if needed\n  };\n  return date.toLocaleTimeString('en-US', options);\n}\n\n// Helper function to get day of the week\nfunction getDayOfWeek(dateString) {\n  const date = new Date(dateString);\n  const options = { weekday: 'long', timeZone: 'America/Los_Angeles' }; // Use specific timezone if needed\n  return date.toLocaleDateString('en-US', options);\n}\n\n// Flatten the slots into a single array\nlet allSlots = [];\nfor (const [date, details] of Object.entries(data)) {\n  if (details.slots) {\n    allSlots = allSlots.concat(details.slots);\n  }\n}\n\n// Check if the target datetime is present\nif (allSlots.includes(targetDateTime)) {\n  const day = getDayOfWeek(targetDateTime);\n  const time = formatTime(targetDateTime);\n  return { result: `${day} at ${time} is available.` };\n} else {\n  // Convert datetimes to Date objects with original strings for time zone preservation\n  const slotsWithOriginal = allSlots.map(slot => ({ date: new Date(slot), original: slot }));\n  const targetDate = new Date(targetDateTime);\n\n  // Sort slots by date\n  const sortedSlots = slotsWithOriginal.sort((a, b) => a.date - b.date);\n\n  // Find the two closest slots\n  let closestBefore = null;\n  let closestAfter = null;\n  let secondClosestAfter = null;\n\n  for (let i = 0; i < sortedSlots.length; i++) {\n    if (sortedSlots[i].date < targetDate) {\n      closestBefore = sortedSlots[i].original;\n    } else if (!closestAfter) {\n      closestAfter = sortedSlots[i].original;\n      if (i + 1 < sortedSlots.length) {\n        secondClosestAfter = sortedSlots[i + 1].original;\n      }\n      break;\n    }\n  }\n\n  // If no closestBefore, return two closest after\n  if (!closestBefore) {\n    closestBefore = closestAfter;\n    closestAfter = secondClosestAfter;\n  }\n\n  return { closestBefore, closestAfter };\n}\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1152,
+        384
+      ],
+      "id": "82540f14-7287-493d-9456-52106a06d0aa",
+      "name": "Code in JavaScript4"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get current year from system date\nconst currentYear = new Date().getFullYear();\nfor (const item of $input.all()) {\n  const appointmentDate = item.json.body?.args?.appointment_datetime;\n  if (appointmentDate) {\n    const oldDate = new Date(appointmentDate);\n    oldDate.setFullYear(currentYear);\n    // Set the updated date back in the same nested structure\n    item.json.body.args.appointment_datetime = oldDate.toISOString();\n  }\n}\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        368
+      ],
+      "id": "16f5d98c-c473-42b6-b206-19004bb80563",
+      "name": "Code in JavaScript5"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "a0f8d331-fee8-4690-8ede-0c824734776c",
+              "leftValue": "={{ $json.body.args.service }}",
+              "rightValue": "Facial",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "id": "430a725d-30b5-40fd-950d-975edcc42f5e",
+              "leftValue": "={{ $json.body.args.service }}",
+              "rightValue": "General",
+              "operator": {
+                "type": "string",
+                "operation": "notContains"
+              }
+            },
+            {
+              "id": "b95526d5-6b9e-4217-9971-a285d29cd3d3",
+              "leftValue": "={{ $json.body.args.service }}",
+              "rightValue": "Botox",
+              "operator": {
+                "type": "string",
+                "operation": "notContains"
+              }
+            },
+            {
+              "id": "0aa4f034-3fce-4971-b417-1d9d8be7659d",
+              "leftValue": "={{ $json.body.args.service }}",
+              "rightValue": "Fillers",
+              "operator": {
+                "type": "string",
+                "operation": "notContains"
+              }
+            },
+            {
+              "id": "df4d4421-1f84-44ee-a3b0-c1f9489596e6",
+              "leftValue": "={{ $json.body.args.service }}",
+              "rightValue": "Wellness",
+              "operator": {
+                "type": "string",
+                "operation": "notContains"
+              }
+            },
+            {
+              "id": "8c8911a5-9fda-4cdc-bf97-561af0fa0ab2",
+              "leftValue": "={{ $json.body.args.service }}",
+              "rightValue": "Laser",
+              "operator": {
+                "type": "string",
+                "operation": "notContains"
+              }
+            },
+            {
+              "id": "25881944-b4ea-40b9-ac95-026456816175",
+              "leftValue": "={{ $json.body.args.service }}",
+              "rightValue": "Body Contouring",
+              "operator": {
+                "type": "string",
+                "operation": "notContains"
+              }
+            },
+            {
+              "id": "31a4e563-3cc9-4f60-87dd-9217d517fdbe",
+              "leftValue": "={{ $json.body.args.service }}",
+              "rightValue": "Weight Loss",
+              "operator": {
+                "type": "string",
+                "operation": "notContains"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -432,
+        368
+      ],
+      "id": "19c3eb45-bdc4-4a54-a149-d52d4a7abd8c",
+      "name": "If2"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.closestBefore }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1424,
+        384
+      ],
+      "id": "f04d0bf1-31bb-4f28-8a3c-2781dbc109c9",
+      "name": "Respond to Webhook2"
+    },
+    {
+      "parameters": {
+        "operation": "addToDate",
+        "magnitude": "={{ $json.formattedDate }}",
+        "duration": 1,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dateTime",
+      "typeVersion": 2,
+      "position": [
+        480,
+        544
+      ],
+      "id": "d6f07193-3fd5-4350-8cea-186bf69ef642",
+      "name": "Get Next Date3"
+    },
+    {
+      "parameters": {
+        "operation": "formatDate",
+        "date": "={{ $json.newDate }}",
+        "format": "x",
+        "outputFieldName": "endDate",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dateTime",
+      "typeVersion": 2,
+      "position": [
+        672,
+        544
+      ],
+      "id": "93f04c11-e7a7-4b4b-8e08-bdcaf7925f34",
+      "name": "Get End Date3"
+    },
+    {
+      "parameters": {
+        "operation": "formatDate",
+        "date": "={{ $json.body.args.appointment_date }}",
+        "format": "x",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dateTime",
+      "typeVersion": 2,
+      "position": [
+        240,
+        544
+      ],
+      "id": "1b71d94d-9fa4-4ce0-90e0-504d467bcf01",
+      "name": "Get Start Date3"
+    },
+    {
+      "parameters": {
+        "url": "https://services.leadconnectorhq.com/calendars/[Calendar ID]/free-slots",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "endDate",
+              "value": "={{ $json.endDate }}"
+            },
+            {
+              "name": "startDate",
+              "value": "={{ $('Get Start Date3').item.json.formattedDate }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer [Your Bearer Token]"
+            },
+            {
+              "name": "Version",
+              "value": "2021-04-15"
+            },
+            {
+              "name": "timezone",
+              "value": "America/New_York"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        912,
+        544
+      ],
+      "id": "32fe7ca4-c38f-4a6a-9037-4c1fe4270fe0",
+      "name": "Get free slots from ghl3"
+    },
+    {
+      "parameters": {
+        "jsCode": "// The datetime to check\nconst targetDateTime = $('Webhook').first().json.body.appointment_date;\n\n// The data object\nconst data = $input.first().json;\n\n// Helper function to format time while respecting the original timezone\nfunction formatTime(dateString) {\n  const date = new Date(dateString);\n  const options = {\n    hour: 'numeric',\n    minute: 'numeric',\n    hour12: true,\n    timeZone: 'America/Los_Angeles' // Use a specific timezone if needed\n  };\n  return date.toLocaleTimeString('en-US', options);\n}\n\n// Helper function to get day of the week\nfunction getDayOfWeek(dateString) {\n  const date = new Date(dateString);\n  const options = { weekday: 'long', timeZone: 'America/Los_Angeles' }; // Use specific timezone if needed\n  return date.toLocaleDateString('en-US', options);\n}\n\n// Flatten the slots into a single array\nlet allSlots = [];\nfor (const [date, details] of Object.entries(data)) {\n  if (details.slots) {\n    allSlots = allSlots.concat(details.slots);\n  }\n}\n\n// Check if the target datetime is present\nif (allSlots.includes(targetDateTime)) {\n  const day = getDayOfWeek(targetDateTime);\n  const time = formatTime(targetDateTime);\n  return { result: `${day} at ${time} is available.` };\n} else {\n  // Convert datetimes to Date objects with original strings for time zone preservation\n  const slotsWithOriginal = allSlots.map(slot => ({ date: new Date(slot), original: slot }));\n  const targetDate = new Date(targetDateTime);\n\n  // Sort slots by date\n  const sortedSlots = slotsWithOriginal.sort((a, b) => a.date - b.date);\n\n  // Find the two closest slots\n  let closestBefore = null;\n  let closestAfter = null;\n  let secondClosestAfter = null;\n\n  for (let i = 0; i < sortedSlots.length; i++) {\n    if (sortedSlots[i].date < targetDate) {\n      closestBefore = sortedSlots[i].original;\n    } else if (!closestAfter) {\n      closestAfter = sortedSlots[i].original;\n      if (i + 1 < sortedSlots.length) {\n        secondClosestAfter = sortedSlots[i + 1].original;\n      }\n      break;\n    }\n  }\n\n  // If no closestBefore, return two closest after\n  if (!closestBefore) {\n    closestBefore = closestAfter;\n    closestAfter = secondClosestAfter;\n  }\n\n  return { closestBefore, closestAfter };\n}\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1152,
+        560
+      ],
+      "id": "074ca419-f364-44d7-872f-942e84ae9f59",
+      "name": "Code in JavaScript6"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get current year from system date\nconst currentYear = new Date().getFullYear();\nfor (const item of $input.all()) {\n  const appointmentDate = item.json.body?.args?.appointment_datetime;\n  if (appointmentDate) {\n    const oldDate = new Date(appointmentDate);\n    oldDate.setFullYear(currentYear);\n    // Set the updated date back in the same nested structure\n    item.json.body.args.appointment_datetime = oldDate.toISOString();\n  }\n}\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        544
+      ],
+      "id": "3d80f9ab-5ac1-4ca6-8147-ad84f70555f6",
+      "name": "Code in JavaScript7"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "a0f8d331-fee8-4690-8ede-0c824734776c",
+              "leftValue": "={{ $json.body.args.service }}",
+              "rightValue": "Botox",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "id": "484ad6dc-eb50-447d-90e8-44bc461da289",
+              "leftValue": "={{ $json.body.args.service }}",
+              "rightValue": "Fillers",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "id": "4d3f31f3-bf94-41d6-b0d1-81530e74e6ef",
+              "leftValue": "={{ $json.body.args.service }}",
+              "rightValue": "Botox & Fillers",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -432,
+        544
+      ],
+      "id": "918a29c5-0d9e-4fbc-bd87-09543936c43e",
+      "name": "If3"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.closestBefore }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1424,
+        560
+      ],
+      "id": "a83b1c4f-cd89-41f1-8310-bf8df63d52ee",
+      "name": "Respond to Webhook3"
+    },
+    {
+      "parameters": {
+        "operation": "addToDate",
+        "magnitude": "={{ $json.formattedDate }}",
+        "duration": 1,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dateTime",
+      "typeVersion": 2,
+      "position": [
+        480,
+        720
+      ],
+      "id": "e0dd9059-3b15-40f2-8807-5224c0307e79",
+      "name": "Get Next Date4"
+    },
+    {
+      "parameters": {
+        "operation": "formatDate",
+        "date": "={{ $json.newDate }}",
+        "format": "x",
+        "outputFieldName": "endDate",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dateTime",
+      "typeVersion": 2,
+      "position": [
+        672,
+        720
+      ],
+      "id": "aa7f7465-023a-4ad2-89c2-2020beed50b1",
+      "name": "Get End Date4"
+    },
+    {
+      "parameters": {
+        "operation": "formatDate",
+        "date": "={{ $json.body.args.appointment_date }}",
+        "format": "x",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dateTime",
+      "typeVersion": 2,
+      "position": [
+        240,
+        720
+      ],
+      "id": "3c9f421f-a733-4938-94c7-e36c7f49d0d3",
+      "name": "Get Start Date4"
+    },
+    {
+      "parameters": {
+        "url": "https://services.leadconnectorhq.com/calendars/[Calendar ID]/free-slots",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "endDate",
+              "value": "={{ $json.endDate }}"
+            },
+            {
+              "name": "startDate",
+              "value": "={{ $('Get Start Date4').item.json.formattedDate }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer [Your Bearer Token]"
+            },
+            {
+              "name": "Version",
+              "value": "2021-04-15"
+            },
+            {
+              "name": "timezone",
+              "value": "America/New_York"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        912,
+        720
+      ],
+      "id": "2a4ca20f-ab7a-4ef4-aef7-ea43dd71a9e3",
+      "name": "Get free slots from ghl4"
+    },
+    {
+      "parameters": {
+        "jsCode": "// The datetime to check\nconst targetDateTime = $('Webhook').first().json.body.appointment_date;\n\n// The data object\nconst data = $input.first().json;\n\n// Helper function to format time while respecting the original timezone\nfunction formatTime(dateString) {\n  const date = new Date(dateString);\n  const options = {\n    hour: 'numeric',\n    minute: 'numeric',\n    hour12: true,\n    timeZone: 'America/Los_Angeles' // Use a specific timezone if needed\n  };\n  return date.toLocaleTimeString('en-US', options);\n}\n\n// Helper function to get day of the week\nfunction getDayOfWeek(dateString) {\n  const date = new Date(dateString);\n  const options = { weekday: 'long', timeZone: 'America/Los_Angeles' }; // Use specific timezone if needed\n  return date.toLocaleDateString('en-US', options);\n}\n\n// Flatten the slots into a single array\nlet allSlots = [];\nfor (const [date, details] of Object.entries(data)) {\n  if (details.slots) {\n    allSlots = allSlots.concat(details.slots);\n  }\n}\n\n// Check if the target datetime is present\nif (allSlots.includes(targetDateTime)) {\n  const day = getDayOfWeek(targetDateTime);\n  const time = formatTime(targetDateTime);\n  return { result: `${day} at ${time} is available.` };\n} else {\n  // Convert datetimes to Date objects with original strings for time zone preservation\n  const slotsWithOriginal = allSlots.map(slot => ({ date: new Date(slot), original: slot }));\n  const targetDate = new Date(targetDateTime);\n\n  // Sort slots by date\n  const sortedSlots = slotsWithOriginal.sort((a, b) => a.date - b.date);\n\n  // Find the two closest slots\n  let closestBefore = null;\n  let closestAfter = null;\n  let secondClosestAfter = null;\n\n  for (let i = 0; i < sortedSlots.length; i++) {\n    if (sortedSlots[i].date < targetDate) {\n      closestBefore = sortedSlots[i].original;\n    } else if (!closestAfter) {\n      closestAfter = sortedSlots[i].original;\n      if (i + 1 < sortedSlots.length) {\n        secondClosestAfter = sortedSlots[i + 1].original;\n      }\n      break;\n    }\n  }\n\n  // If no closestBefore, return two closest after\n  if (!closestBefore) {\n    closestBefore = closestAfter;\n    closestAfter = secondClosestAfter;\n  }\n\n  return { closestBefore, closestAfter };\n}\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1152,
+        736
+      ],
+      "id": "258bcdc7-fb50-49a9-aca7-fddee94451c7",
+      "name": "Code in JavaScript8"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get current year from system date\nconst currentYear = new Date().getFullYear();\nfor (const item of $input.all()) {\n  const appointmentDate = item.json.body?.args?.appointment_datetime;\n  if (appointmentDate) {\n    const oldDate = new Date(appointmentDate);\n    oldDate.setFullYear(currentYear);\n    // Set the updated date back in the same nested structure\n    item.json.body.args.appointment_datetime = oldDate.toISOString();\n  }\n}\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        720
+      ],
+      "id": "aa81ea53-3baa-42d1-9aa8-f8b51a189c60",
+      "name": "Code in JavaScript9"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "a0f8d331-fee8-4690-8ede-0c824734776c",
+              "leftValue": "={{ $json.body.args.service }}",
+              "rightValue": "Body Contouring",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "id": "484ad6dc-eb50-447d-90e8-44bc461da289",
+              "leftValue": "={{ $json.body.args.service }}",
+              "rightValue": "Fat Reduction",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "id": "4d3f31f3-bf94-41d6-b0d1-81530e74e6ef",
+              "leftValue": "={{ $json.body.args.service }}",
+              "rightValue": "Medical Weight Loss",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -432,
+        720
+      ],
+      "id": "e16b6497-fd88-43e1-bf63-79459d83890b",
+      "name": "If4"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.closestBefore }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1424,
+        736
+      ],
+      "id": "6a26466f-7841-4bbb-8ef8-17820f13e731",
+      "name": "Respond to Webhook4"
+    },
+    {
+      "parameters": {
+        "operation": "addToDate",
+        "magnitude": "={{ $json.formattedDate }}",
+        "duration": 1,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dateTime",
+      "typeVersion": 2,
+      "position": [
+        480,
+        928
+      ],
+      "id": "ec8e5859-e609-4e2f-ab14-77d388c5502e",
+      "name": "Get Next Date5"
+    },
+    {
+      "parameters": {
+        "operation": "formatDate",
+        "date": "={{ $json.newDate }}",
+        "format": "x",
+        "outputFieldName": "endDate",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dateTime",
+      "typeVersion": 2,
+      "position": [
+        672,
+        928
+      ],
+      "id": "f83686cd-5f0a-4183-a3a3-c372d055ce13",
+      "name": "Get End Date5"
+    },
+    {
+      "parameters": {
+        "operation": "formatDate",
+        "date": "={{ $json.body.args.appointment_date }}",
+        "format": "x",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dateTime",
+      "typeVersion": 2,
+      "position": [
+        240,
+        928
+      ],
+      "id": "89824e18-6f4b-4106-994f-d061504d5c48",
+      "name": "Get Start Date5"
+    },
+    {
+      "parameters": {
+        "url": "https://services.leadconnectorhq.com/calendars/[Calendar ID]/free-slots",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "endDate",
+              "value": "={{ $json.endDate }}"
+            },
+            {
+              "name": "startDate",
+              "value": "={{ $('Get Start Date5').item.json.formattedDate }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer [Your Bearer Token]"
+            },
+            {
+              "name": "Version",
+              "value": "2021-04-15"
+            },
+            {
+              "name": "timezone",
+              "value": "America/New_York"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        912,
+        928
+      ],
+      "id": "16d00d7c-795e-4a9f-af58-943798ee39aa",
+      "name": "Get free slots from ghl5"
+    },
+    {
+      "parameters": {
+        "jsCode": "// The datetime to check\nconst targetDateTime = $('Webhook').first().json.body.appointment_date;\n\n// The data object\nconst data = $input.first().json;\n\n// Helper function to format time while respecting the original timezone\nfunction formatTime(dateString) {\n  const date = new Date(dateString);\n  const options = {\n    hour: 'numeric',\n    minute: 'numeric',\n    hour12: true,\n    timeZone: 'America/Los_Angeles' // Use a specific timezone if needed\n  };\n  return date.toLocaleTimeString('en-US', options);\n}\n\n// Helper function to get day of the week\nfunction getDayOfWeek(dateString) {\n  const date = new Date(dateString);\n  const options = { weekday: 'long', timeZone: 'America/Los_Angeles' }; // Use specific timezone if needed\n  return date.toLocaleDateString('en-US', options);\n}\n\n// Flatten the slots into a single array\nlet allSlots = [];\nfor (const [date, details] of Object.entries(data)) {\n  if (details.slots) {\n    allSlots = allSlots.concat(details.slots);\n  }\n}\n\n// Check if the target datetime is present\nif (allSlots.includes(targetDateTime)) {\n  const day = getDayOfWeek(targetDateTime);\n  const time = formatTime(targetDateTime);\n  return { result: `${day} at ${time} is available.` };\n} else {\n  // Convert datetimes to Date objects with original strings for time zone preservation\n  const slotsWithOriginal = allSlots.map(slot => ({ date: new Date(slot), original: slot }));\n  const targetDate = new Date(targetDateTime);\n\n  // Sort slots by date\n  const sortedSlots = slotsWithOriginal.sort((a, b) => a.date - b.date);\n\n  // Find the two closest slots\n  let closestBefore = null;\n  let closestAfter = null;\n  let secondClosestAfter = null;\n\n  for (let i = 0; i < sortedSlots.length; i++) {\n    if (sortedSlots[i].date < targetDate) {\n      closestBefore = sortedSlots[i].original;\n    } else if (!closestAfter) {\n      closestAfter = sortedSlots[i].original;\n      if (i + 1 < sortedSlots.length) {\n        secondClosestAfter = sortedSlots[i + 1].original;\n      }\n      break;\n    }\n  }\n\n  // If no closestBefore, return two closest after\n  if (!closestBefore) {\n    closestBefore = closestAfter;\n    closestAfter = secondClosestAfter;\n  }\n\n  return { closestBefore, closestAfter };\n}\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1152,
+        944
+      ],
+      "id": "3f8cff06-65a3-4d3d-aab5-63a67a8105a7",
+      "name": "Code in JavaScript10"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get current year from system date\nconst currentYear = new Date().getFullYear();\nfor (const item of $input.all()) {\n  const appointmentDate = item.json.body?.args?.appointment_datetime;\n  if (appointmentDate) {\n    const oldDate = new Date(appointmentDate);\n    oldDate.setFullYear(currentYear);\n    // Set the updated date back in the same nested structure\n    item.json.body.args.appointment_datetime = oldDate.toISOString();\n  }\n}\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        928
+      ],
+      "id": "f086cecb-7410-491d-9c97-0da98e6cc577",
+      "name": "Code in JavaScript11"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "a0f8d331-fee8-4690-8ede-0c824734776c",
+              "leftValue": "={{ $json.body.args.service }}",
+              "rightValue": "Wellness Therapy",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "id": "484ad6dc-eb50-447d-90e8-44bc461da289",
+              "leftValue": "={{ $json.body.args.service }}",
+              "rightValue": "IV Therapy",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -432,
+        928
+      ],
+      "id": "18d0b9cf-6d58-40c9-aa4c-41410d8dd6aa",
+      "name": "If5"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.closestBefore }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1424,
+        944
+      ],
+      "id": "c3058f2d-8ce2-4f7c-bbb2-e389df11f524",
+      "name": "Respond to Webhook5"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Next Date": {
+      "main": [
+        [
+          {
+            "node": "Get End Date",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Start Date": {
+      "main": [
+        [
+          {
+            "node": "Get Next Date",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get End Date": {
+      "main": [
+        [
+          {
+            "node": "Get free slots from ghl",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get free slots from ghl": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Get Start Date",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "If2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "If3",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "If4",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "If5",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "If4",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "If4",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "If5",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "If3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Next Date1": {
+      "main": [
+        [
+          {
+            "node": "Get End Date1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get End Date1": {
+      "main": [
+        [
+          {
+            "node": "Get free slots from ghl1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Start Date1": {
+      "main": [
+        [
+          {
+            "node": "Get Next Date1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get free slots from ghl1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript2": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript3": {
+      "main": [
+        [
+          {
+            "node": "Get Start Date1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Next Date2": {
+      "main": [
+        [
+          {
+            "node": "Get End Date2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get End Date2": {
+      "main": [
+        [
+          {
+            "node": "Get free slots from ghl2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Start Date2": {
+      "main": [
+        [
+          {
+            "node": "Get Next Date2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get free slots from ghl2": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript5": {
+      "main": [
+        [
+          {
+            "node": "Get Start Date2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If2": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript4": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Next Date3": {
+      "main": [
+        [
+          {
+            "node": "Get End Date3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get End Date3": {
+      "main": [
+        [
+          {
+            "node": "Get free slots from ghl3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Start Date3": {
+      "main": [
+        [
+          {
+            "node": "Get Next Date3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get free slots from ghl3": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript6": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript7": {
+      "main": [
+        [
+          {
+            "node": "Get Start Date3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If3": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Next Date4": {
+      "main": [
+        [
+          {
+            "node": "Get End Date4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get End Date4": {
+      "main": [
+        [
+          {
+            "node": "Get free slots from ghl4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Start Date4": {
+      "main": [
+        [
+          {
+            "node": "Get Next Date4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get free slots from ghl4": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript8",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript8": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript9": {
+      "main": [
+        [
+          {
+            "node": "Get Start Date4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If4": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript9",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Next Date5": {
+      "main": [
+        [
+          {
+            "node": "Get End Date5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get End Date5": {
+      "main": [
+        [
+          {
+            "node": "Get free slots from ghl5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Start Date5": {
+      "main": [
+        [
+          {
+            "node": "Get Next Date5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get free slots from ghl5": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript10",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript10": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript11": {
+      "main": [
+        [
+          {
+            "node": "Get Start Date5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If5": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript11",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "95b58bba-57d4-4f30-9341-97a697ba5100",
+  "meta": {
+    "instanceId": "6c4c446d5304742a3c3b35610a91a9314f8fa6e78abf59256949d198dc0f9226"
+  },
+  "id": "azxeyRux7RABiKVl",
+  "tags": []
+}
