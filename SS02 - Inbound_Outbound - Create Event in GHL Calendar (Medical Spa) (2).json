@@ -1,0 +1,102 @@
+{
+  "name": "SS02 - Inbound/Outbound - Create Event in GHL Calendar (Medical Spa)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "f111f187-f6de-4c2e-9708-3b9ff8a3ae63",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -544,
+        304
+      ],
+      "id": "a04528eb-47b0-4ca7-bc6c-6d89281fe7b8",
+      "name": "Webhook",
+      "webhookId": "f111f187-f6de-4c2e-9708-3b9ff8a3ae63"
+    },
+    {
+      "parameters": {
+        "amount": 1
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -336,
+        304
+      ],
+      "id": "29ea852f-751b-48df-9e63-0015c1a301fe",
+      "name": "Wait",
+      "webhookId": "8358c008-1507-4059-a401-2fce152972e3"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.retellai.com/v2/create-phone-call",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer Token"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"from_number\": \"Numer\",\n  \"to_number\": \"+Number\",\n  \"call_type\": \"phone_call\",\n  \"retell_llm_dynamic_variables\": {\n    \"name\": \"{{ $json.body.full_name }}\",\n    \"email\": \"{{ $json.body.email }}\",\n    \"phone\": \"{{ $json.body.phone }}\"\n  },\n  \"override_agent_id\": \"[agentid]\"\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -128,
+        304
+      ],
+      "id": "3ca3e456-7cf7-4ad5-87ca-43af62dd7a76",
+      "name": "HTTP Request"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "a76a4853-8e90-40b6-8e09-92061e72ff0e",
+  "meta": {
+    "instanceId": "6c4c446d5304742a3c3b35610a91a9314f8fa6e78abf59256949d198dc0f9226"
+  },
+  "id": "azxeyRux7RABiKVl",
+  "tags": []
+}
